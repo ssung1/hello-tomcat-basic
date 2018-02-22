@@ -1,0 +1,110 @@
+<project xmlns:ivy="antlib:org.apache.ivy.ant" name="hello tomcat basic" default="war">
+
+<!-- ===================================================================== -->
+<!-- settings                                                              -->
+<!-- ===================================================================== -->
+<!-- this controls the Ivy version; it is used as part of the jar name     -->
+<!-- it must exist on the server from which we are downloading Ivy         -->
+<property name="ivy.install.version" value="2.4.0"/>
+<!-- this is the location where we are saving our local copy of Ivy jar    -->
+<property name="ivy.jar.dir" value="${basedir}/ivy"/>
+<!-- this is how we want to name our local copy of Ivy jar                 -->
+<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar"/>
+<!-- this is the location of our compiled class files                      -->
+<property name="build.dir" value="build"/>
+<!-- this is the location of our source Java files                         -->
+<property name="src.dir" value="src"/>
+<!-- this is the location of the dependencies that will be included with
+     Tomcat.  we need to have these to compile, but the will not be part
+     of the final war file                                                 -->
+<property name="lib.dir.provided" value="lib/provided"/>
+
+<!-- ===================================================================== -->
+<!-- builds                                                                -->
+<!-- ===================================================================== -->
+<!-- this calls Ivy to make sure all the dependencies are available        -->
+<target name="resolve" depends="install-ivy"
+    description="resolve dependencies">
+    <ivy:resolve file="ivy.xml"/>
+</target>
+
+<!-- this downloads all the "provided" dependencies to a local directory   -->
+<target name="fetch-depends-provided" depends="install-ivy"
+    description="put dependencies in lib directory">
+    <mkdir dir="${lib.dir.provided}"/>
+    <ivy:retrieve pattern="${lib.dir.provided}/[artifact]-[revision].[ext]"
+        conf="provided" sync="true"/>
+    <ivy:dependencytree file="ivy.xml"/>
+</target>
+
+<!-- this compiles the sources into the build directory                    -->
+<target name="compile" depends="resolve" description="compile Java files">
+    <ivy:cachepath pathid="lib.path.id" file="ivy.xml" conf="provided"/>
+    <mkdir dir="${build.dir}"/>
+    <javac destdir="${build.dir}" source="1.5" target="1.5"
+        includeantruntime="false" nowarn="true">
+        <src path="${src.dir}"/>
+        <classpath>
+            <path refid="lib.path.id"/>
+            <path location="${build.dir}"/>
+        </classpath>
+    </javac>
+</target>
+
+<target name="war" depends="compile" description="creates war file">
+    <war destfile="hello-tomcat-basic.war">
+        <!-- compiled classes go here -->
+        <classes dir="${build.dir}"/>
+        <!-- static web files go here -->
+        <fileset dir="web"/>
+        <!-- dependency jars go here, but we don't have any in this sample -->
+        <!-- <lib dir="${lib.dir}"/> -->
+    </war>
+</target>
+
+<!-- ===================================================================== -->
+<!-- clean                                                                 -->
+<!-- ===================================================================== -->
+<target name="clean" description="clean the project">
+    <delete includeemptydirs="true" quiet="true">
+        <fileset dir="${build.dir}"/>
+        <fileset file="sample.war"/>
+    </delete>
+</target>
+
+<target name="clean-lib" description="clean the library folder">
+    <delete includeemptydirs="true" quiet="true">
+        <fileset dir="${lib.dir.provided}"/>
+    </delete>
+</target>
+
+<target name="clean-cache" depends="install-ivy"
+    description="clean the ivy cache">
+    <ivy:cleancache/>
+</target>
+
+<target name="clean-ivy" description="clean the ivy installation">
+    <delete dir="${ivy.jar.dir}"/>
+</target>
+
+<!-- ===================================================================== -->
+<!-- Ivy internal stuff: generally no need to touch                        -->
+<!-- ===================================================================== -->
+<!-- this downloads Ivy from a public repository and saves it on a local
+     directory                                                             -->
+<target name="download-ivy" unless="skip.download">
+    <mkdir dir="${ivy.jar.dir}"/>
+    <echo message="installing ivy..."/>
+    <get src="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar" dest="${ivy.jar.file}" usetimestamp="true"/>
+</target>
+
+<!-- this sets up the Ivy-related tasks to be used by later build steps   -->
+<target name="install-ivy" depends="download-ivy" description="install ivy">
+    <path id="ivy.lib.path">
+        <fileset dir="${ivy.jar.dir}" includes="*.jar"/>
+    </path>
+    <taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
+    <ivy:settings file="ivysettings.xml"/>
+</target>
+
+</project>
